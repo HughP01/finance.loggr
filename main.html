@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>financr</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #12121a;
+    --surface2: #1a1a28;
+    --border: #2a2a40;
+    --accent: #7c6fff;
+    --accent2: #ff6b6b;
+    --green: #4fffb0;
+    --yellow: #ffd166;
+    --text: #e8e8f0;
+    --muted: #6a6a8a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .noise {
+    position: fixed; inset: 0; pointer-events: none; z-index: 100; opacity: 0.03;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  header {
+    padding: 2rem 3rem;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(20px);
+    z-index: 50;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 1.4rem;
+    letter-spacing: -0.02em;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .status-pill {
+    font-size: 0.7rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .status-pill.loaded { border-color: var(--green); color: var(--green); }
+
+  main { padding: 2rem 3rem; max-width: 1400px; margin: 0 auto; }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 16px;
+    padding: 4rem 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 2rem;
+  }
+
+  .upload-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at center, rgba(124,111,255,0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+  }
+  .upload-zone:hover::before, .upload-zone.drag-over::before { opacity: 1; }
+
+  .upload-icon {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%,100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .upload-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .upload-sub {
+    color: var(--muted);
+    font-size: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 0.7rem 1.5rem;
+    border-radius: 8px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.05em;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(124,111,255,0.4); }
+
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--accent); color: var(--accent); box-shadow: none; }
+
+  /* COLUMN MAPPING */
+  .mapping-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    display: none;
+  }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .mapping-field label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    margin-bottom: 0.5rem;
+  }
+
+  select {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.6rem 0.8rem;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  select:focus { border-color: var(--accent); }
+
+  /* DASHBOARD */
+  #dashboard { display: none; }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-3px); border-color: var(--accent); }
+
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent);
+  }
+
+  .kpi-card.income::after { background: var(--green); }
+  .kpi-card.expense::after { background: var(--accent2); }
+  .kpi-card.net::after { background: var(--yellow); }
+  .kpi-card.savings::after { background: var(--accent); }
+
+  .kpi-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    margin-bottom: 0.8rem;
+  }
+
+  .kpi-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 1.8rem;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    line-height: 1;
+  }
+
+  .kpi-value.positive { color: var(--green); }
+  .kpi-value.negative { color: var(--accent2); }
+  .kpi-value.neutral { color: var(--yellow); }
+
+  .kpi-sub {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+  }
+
+  .chart-card.full { grid-column: 1 / -1; }
+
+  .chart-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin-bottom: 1.2rem;
+  }
+
+  .chart-wrap { position: relative; height: 240px; }
+  .chart-wrap.tall { height: 300px; }
+
+  /* TABLE */
+  .table-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 2rem;
+    overflow: hidden;
+  }
+
+  .table-controls {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.2rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  input[type="text"], input[type="date"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.5rem 0.8rem;
+    border-radius: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input:focus { border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+
+  .table-wrap { overflow-x: auto; max-height: 360px; overflow-y: auto; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+
+  th {
+    text-align: left;
+    padding: 0.7rem 1rem;
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0;
+    background: var(--surface);
+    cursor: pointer;
+  }
+  th:hover { color: var(--accent); }
+
+  td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid rgba(42,42,64,0.5);
+    transition: background 0.15s;
+  }
+
+  tr:hover td { background: var(--surface2); }
+
+  .badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .badge-income { background: rgba(79,255,176,0.15); color: var(--green); }
+  .badge-expense { background: rgba(255,107,107,0.15); color: var(--accent2); }
+
+  .amount-pos { color: var(--green); }
+  .amount-neg { color: var(--accent2); }
+
+  /* INSIGHTS */
+  .insights-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  .insight-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.4rem;
+    border-left: 3px solid var(--accent);
+  }
+
+  .insight-card.warn { border-left-color: var(--yellow); }
+  .insight-card.good { border-left-color: var(--green); }
+  .insight-card.bad { border-left-color: var(--accent2); }
+
+  .insight-icon { font-size: 1.4rem; margin-bottom: 0.5rem; }
+  .insight-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-bottom: 0.4rem;
+  }
+  .insight-body { font-size: 0.75rem; color: var(--muted); line-height: 1.6; }
+
+  /* SAMPLE FORMAT NOTE */
+  .format-note {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1.2rem 1.5rem;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 1rem;
+    line-height: 1.8;
+  }
+
+  .format-note strong { color: var(--text); }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--surface); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+
+  .fade-in { animation: fadeIn 0.5s ease forwards; }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+  .tag-filter {
+    display: flex; gap: 0.5rem; flex-wrap: wrap;
+  }
+
+  .tag {
+    padding: 0.25rem 0.7rem;
+    border-radius: 100px;
+    border: 1px solid var(--border);
+    font-size: 0.68rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: capitalize;
+  }
+  .tag:hover, .tag.active { border-color: var(--accent); color: var(--accent); background: rgba(124,111,255,0.1); }
+  .tag.all.active { border-color: var(--accent); color: var(--accent); background: rgba(124,111,255,0.1); }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+
+<header>
+  <div class="logo">financr</div>
+  <div id="statusPill" class="status-pill">awaiting data</div>
+</header>
+
+<main>
+  <!-- UPLOAD -->
+  <div class="upload-zone" id="uploadZone">
+    <span class="upload-icon">📊</span>
+    <div class="upload-title">Drop your Excel file here</div>
+    <div class="upload-sub">.xlsx or .xls files supported · Your data stays local, nothing is uploaded</div>
+    <button class="btn" onclick="document.getElementById('fileInput').click()">Choose File</button>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
+    <div class="format-note" style="max-width:500px;margin:1.5rem auto 0;">
+      <strong>Expected columns (flexible):</strong><br>
+      Date · Description/Category · Amount · Type (income/expense) <br>
+      Or any combination — you'll map columns after upload.
+    </div>
+  </div>
+
+  <!-- COLUMN MAPPING -->
+  <div class="mapping-section" id="mappingSection">
+    <div class="section-title">Map Your Columns</div>
+    <div class="mapping-grid">
+      <div class="mapping-field">
+        <label>Date Column</label>
+        <select id="mapDate"><option value="">-- select --</option></select>
+      </div>
+      <div class="mapping-field">
+        <label>Amount Column</label>
+        <select id="mapAmount"><option value="">-- select --</option></select>
+      </div>
+      <div class="mapping-field">
+        <label>Type Column <small style="color:var(--muted)">(income/expense)</small></label>
+        <select id="mapType"><option value="">-- optional --</option></select>
+      </div>
+      <div class="mapping-field">
+        <label>Category Column</label>
+        <select id="mapCategory"><option value="">-- optional --</option></select>
+      </div>
+      <div class="mapping-field">
+        <label>Description Column</label>
+        <select id="mapDescription"><option value="">-- optional --</option></select>
+      </div>
+      <div class="mapping-field">
+        <label>If no Type column — treat as</label>
+        <select id="defaultType">
+          <option value="auto">Auto-detect (neg=expense, pos=income)</option>
+          <option value="income">All Income</option>
+          <option value="expense">All Expenses</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" onclick="buildDashboard()">Analyse →</button>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard">
+    <!-- KPIs -->
+    <div class="kpi-grid fade-in" id="kpiGrid"></div>
+
+    <!-- CHARTS ROW 1 -->
+    <div class="charts-grid fade-in">
+      <div class="chart-card full">
+        <div class="chart-title">Income vs Expenses Over Time</div>
+        <div class="chart-wrap tall"><canvas id="timelineChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Spending by Category</div>
+        <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Income vs Expense Split</div>
+        <div class="chart-wrap"><canvas id="splitChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- INSIGHTS -->
+    <div class="section-title" style="margin-bottom:1rem">AI Insights</div>
+    <div class="insights-grid fade-in" id="insightsGrid"></div>
+
+    <!-- TABLE -->
+    <div class="table-section fade-in">
+      <div class="section-title">Transaction Explorer</div>
+      <div class="table-controls">
+        <input type="text" id="searchInput" placeholder="Search descriptions..." oninput="renderTable()">
+        <div class="tag-filter" id="typeFilter">
+          <span class="tag all active" onclick="setTypeFilter('all', this)">All</span>
+          <span class="tag" onclick="setTypeFilter('income', this)">Income</span>
+          <span class="tag" onclick="setTypeFilter('expense', this)">Expenses</span>
+        </div>
+        <div class="tag-filter" id="categoryFilter"></div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr id="tableHead"></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+      <div id="tableFooter" style="font-size:0.72rem;color:var(--muted);margin-top:0.8rem;"></div>
+    </div>
+    <div style="text-align:center;margin-top:1rem;">
+      <button class="btn btn-outline" onclick="resetAll()">Load New File</button>
+    </div>
+  </div>
+</main>
+
+<script>
+let rawData = [], parsedData = [], headers = [];
+let charts = {};
+let currentTypeFilter = 'all';
+let currentCategories = new Set(['all']);
+let activeCategoryFilter = 'all';
+let sortCol = null, sortDir = 1;
+
+// ---- UPLOAD ----
+const uploadZone = document.getElementById('uploadZone');
+const fileInput = document.getElementById('fileInput');
+
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', e => handleFile(e.target.files[0]));
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const wb = XLSX.read(e.target.result, { type: 'binary', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (!json.length) return;
+    headers = json[0].map(String);
+    rawData = json.slice(1).filter(r => r.some(c => c !== ''));
+    setupMapping();
+  };
+  reader.readAsBinaryString(file);
+}
+
+function setupMapping() {
+  const selects = ['mapDate','mapAmount','mapType','mapCategory','mapDescription'];
+  selects.forEach(id => {
+    const sel = document.getElementById(id);
+    sel.innerHTML = sel.id === 'mapType' || sel.id === 'mapCategory' || sel.id === 'mapDescription'
+      ? '<option value="">-- optional --</option>'
+      : '<option value="">-- select --</option>';
+    headers.forEach((h,i) => {
+      const opt = document.createElement('option');
+      opt.value = i; opt.textContent = h;
+      // auto-guess
+      const hl = h.toLowerCase();
+      if (id==='mapDate' && /date|time|day/.test(hl)) opt.selected = true;
+      if (id==='mapAmount' && /amount|sum|value|price|total|credit|debit/.test(hl)) opt.selected = true;
+      if (id==='mapType' && /type|kind|direction|category/.test(hl)) opt.selected = true;
+      if (id==='mapCategory' && /categ|tag|label/.test(hl)) opt.selected = true;
+      if (id==='mapDescription' && /desc|memo|note|narr|detail|name/.test(hl)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+  document.getElementById('mappingSection').style.display = 'block';
+  uploadZone.style.display = 'none';
+}
+
+function buildDashboard() {
+  const di = document.getElementById('mapDate').value;
+  const ai = document.getElementById('mapAmount').value;
+  const ti = document.getElementById('mapType').value;
+  const ci = document.getElementById('mapCategory').value;
+  const desi = document.getElementById('mapDescription').value;
+  const defType = document.getElementById('defaultType').value;
+
+  if (ai === '') { alert('Please select an Amount column.'); return; }
+
+  parsedData = rawData.map(row => {
+    const amt = parseFloat(String(row[ai]).replace(/[^0-9.\-]/g,'')) || 0;
+    let type = '';
+    if (ti !== '') {
+      type = String(row[ti]).toLowerCase().includes('income') || String(row[ti]).toLowerCase().includes('credit') || String(row[ti]).toLowerCase().includes('in') ? 'income' : 'expense';
+    } else if (defType === 'auto') {
+      type = amt >= 0 ? 'income' : 'expense';
+    } else {
+      type = defType;
+    }
+    let dateVal = di !== '' ? row[di] : '';
+    let dateObj = null;
+    if (dateVal) {
+      if (dateVal instanceof Date) dateObj = dateVal;
+      else { dateObj = new Date(dateVal); if (isNaN(dateObj)) dateObj = null; }
+    }
+    return {
+      date: dateObj,
+      dateStr: dateObj ? dateObj.toISOString().slice(0,10) : String(dateVal || ''),
+      amount: Math.abs(amt),
+      type,
+      category: ci !== '' ? String(row[ci] || 'Other') : '',
+      description: desi !== '' ? String(row[desi] || '') : '',
+      raw: row
+    };
+  }).filter(d => d.amount > 0);
+
+  document.getElementById('mappingSection').style.display = 'none';
+  renderDashboard();
+}
+
+function renderDashboard() {
+  document.getElementById('statusPill').textContent = `${parsedData.length} transactions`;
+  document.getElementById('statusPill').className = 'status-pill loaded';
+  document.getElementById('dashboard').style.display = 'block';
+
+  renderKPIs();
+  renderCharts();
+  renderInsights();
+  renderTable();
+  renderCategoryFilter();
+}
+
+function getStats() {
+  const income = parsedData.filter(d => d.type === 'income');
+  const expense = parsedData.filter(d => d.type === 'expense');
+  const totalIncome = income.reduce((s,d) => s+d.amount, 0);
+  const totalExpense = expense.reduce((s,d) => s+d.amount, 0);
+  const net = totalIncome - totalExpense;
+  const savingsRate = totalIncome > 0 ? (net / totalIncome * 100) : 0;
+  return { income, expense, totalIncome, totalExpense, net, savingsRate };
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat('en-IE', {style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n);
+}
+
+function renderKPIs() {
+  const { totalIncome, totalExpense, net, savingsRate, income, expense } = getStats();
+  const grid = document.getElementById('kpiGrid');
+  grid.innerHTML = '';
+  const items = [
+    { label: 'Total Income', val: fmt(totalIncome), cls: 'income positive', sub: `${income.length} transactions` },
+    { label: 'Total Expenses', val: fmt(totalExpense), cls: 'expense negative', sub: `${expense.length} transactions` },
+    { label: 'Net Balance', val: fmt(net), cls: 'net ' + (net>=0?'positive':'negative'), sub: net>=0?'Positive cash flow':'Deficit' },
+    { label: 'Savings Rate', val: savingsRate.toFixed(1)+'%', cls: 'savings '+(savingsRate>=20?'positive':savingsRate>=0?'neutral':'negative'), sub: savingsRate>=20?'Excellent':'Needs attention' },
+    { label: 'Avg Transaction', val: fmt(parsedData.reduce((s,d)=>s+d.amount,0)/parsedData.length||0), cls: '', sub: `${parsedData.length} total records` },
+    { label: 'Largest Expense', val: fmt(Math.max(...getStats().expense.map(d=>d.amount), 0)), cls: 'expense negative', sub: 'Single transaction' },
+  ];
+  items.forEach(item => {
+    grid.innerHTML += `<div class="kpi-card ${item.cls.split(' ')[0]}">
+      <div class="kpi-label">${item.label}</div>
+      <div class="kpi-value ${item.cls.split(' ')[1]||''}">${item.val}</div>
+      <div class="kpi-sub">${item.sub}</div>
+    </div>`;
+  });
+}
+
+function renderCharts() {
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+
+  const income = parsedData.filter(d=>d.type==='income');
+  const expense = parsedData.filter(d=>d.type==='expense');
+
+  // Timeline
+  const months = {};
+  parsedData.forEach(d => {
+    if (!d.date) return;
+    const k = d.date.toISOString().slice(0,7);
+    if (!months[k]) months[k] = {income:0, expense:0};
+    months[k][d.type] += d.amount;
+  });
+  const keys = Object.keys(months).sort();
+  charts.timeline = new Chart(document.getElementById('timelineChart'), {
+    type: 'bar',
+    data: {
+      labels: keys,
+      datasets: [
+        { label: 'Income', data: keys.map(k=>months[k].income), backgroundColor: 'rgba(79,255,176,0.7)', borderRadius: 4 },
+        { label: 'Expenses', data: keys.map(k=>months[k].expense), backgroundColor: 'rgba(255,107,107,0.7)', borderRadius: 4 },
+      ]
+    },
+    options: chartOpts({ stacked: false })
+  });
+
+  // Category
+  const cats = {};
+  expense.forEach(d => {
+    const k = d.category || 'Uncategorized';
+    cats[k] = (cats[k]||0) + d.amount;
+  });
+  const catKeys = Object.keys(cats).sort((a,b)=>cats[b]-cats[a]).slice(0,10);
+  const palette = ['#7c6fff','#ff6b6b','#4fffb0','#ffd166','#a29bfe','#fd79a8','#00cec9','#e17055','#6c5ce7','#fdcb6e'];
+  charts.category = new Chart(document.getElementById('categoryChart'), {
+    type: 'bar',
+    data: {
+      labels: catKeys,
+      datasets: [{ data: catKeys.map(k=>cats[k]), backgroundColor: palette, borderRadius: 4 }]
+    },
+    options: { ...chartOpts(), indexAxis: 'y', plugins: { legend: { display: false } } }
+  });
+
+  // Split donut
+  const { totalIncome, totalExpense } = getStats();
+  charts.split = new Chart(document.getElementById('splitChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Income', 'Expenses'],
+      datasets: [{ data: [totalIncome, totalExpense], backgroundColor: ['rgba(79,255,176,0.8)','rgba(255,107,107,0.8)'], borderWidth: 0, hoverOffset: 8 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { color: '#6a6a8a', font: { family: 'JetBrains Mono', size: 11 }, padding: 16 } } }
+    }
+  });
+}
+
+function chartOpts(extra={}) {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: '#6a6a8a', font: { family: 'JetBrains Mono', size: 11 } } } },
+    scales: {
+      x: { stacked: extra.stacked||false, grid: { color: 'rgba(42,42,64,0.5)' }, ticks: { color: '#6a6a8a', font: { family: 'JetBrains Mono', size: 10 } } },
+      y: { stacked: extra.stacked||false, grid: { color: 'rgba(42,42,64,0.5)' }, ticks: { color: '#6a6a8a', font: { family: 'JetBrains Mono', size: 10 }, callback: v => '€'+v.toLocaleString() } }
+    }
+  };
+}
+
+function renderInsights() {
+  const { totalIncome, totalExpense, net, savingsRate, expense } = getStats();
+  const insights = [];
+
+  if (savingsRate >= 20) insights.push({ type:'good', icon:'✅', title:'Healthy savings rate', body:`You're saving ${savingsRate.toFixed(1)}% of income. Financial advisors recommend at least 20%.` });
+  else if (savingsRate > 0) insights.push({ type:'warn', icon:'⚠️', title:'Low savings rate', body:`You're only saving ${savingsRate.toFixed(1)}% of income. Try to increase this to 20%+ to build financial resilience.` });
+  else if (savingsRate < 0) insights.push({ type:'bad', icon:'🔴', title:'Spending exceeds income', body:`Expenses exceed income by ${fmt(Math.abs(net))}. Review your largest expense categories urgently.` });
+
+  // Top category
+  const cats = {};
+  expense.forEach(d => { const k = d.category || 'Uncategorized'; cats[k] = (cats[k]||0) + d.amount; });
+  const topCat = Object.entries(cats).sort((a,b)=>b[1]-a[1])[0];
+  if (topCat) insights.push({ type:'', icon:'📌', title:`Top expense: ${topCat[0]}`, body:`${fmt(topCat[1])} spent on ${topCat[0]}, representing ${(topCat[1]/totalExpense*100).toFixed(1)}% of total expenses.` });
+
+  // Avg monthly
+  const months = new Set(parsedData.filter(d=>d.date).map(d=>d.date.toISOString().slice(0,7)));
+  const mCount = Math.max(months.size, 1);
+  insights.push({ type:'', icon:'📅', title:'Monthly averages', body:`Avg income ${fmt(totalIncome/mCount)}/mo · Avg expenses ${fmt(totalExpense/mCount)}/mo across ${mCount} month(s).` });
+
+  // Largest single expense
+  const largest = [...expense].sort((a,b)=>b.amount-a.amount)[0];
+  if (largest) insights.push({ type:'warn', icon:'💸', title:'Largest single expense', body:`${fmt(largest.amount)}${largest.description?' — '+largest.description:''} on ${largest.dateStr}. Consider if recurring.` });
+
+  const grid = document.getElementById('insightsGrid');
+  grid.innerHTML = insights.map(ins => `
+    <div class="insight-card ${ins.type}">
+      <div class="insight-icon">${ins.icon}</div>
+      <div class="insight-title">${ins.title}</div>
+      <div class="insight-body">${ins.body}</div>
+    </div>`).join('');
+}
+
+function renderCategoryFilter() {
+  const cats = [...new Set(parsedData.map(d=>d.category).filter(Boolean))];
+  const el = document.getElementById('categoryFilter');
+  el.innerHTML = '';
+  if (!cats.length) return;
+  cats.forEach(cat => {
+    const tag = document.createElement('span');
+    tag.className = 'tag'; tag.textContent = cat;
+    tag.onclick = () => {
+      activeCategoryFilter = activeCategoryFilter === cat ? 'all' : cat;
+      document.querySelectorAll('#categoryFilter .tag').forEach(t => t.classList.remove('active'));
+      if (activeCategoryFilter !== 'all') tag.classList.add('active');
+      renderTable();
+    };
+    el.appendChild(tag);
+  });
+}
+
+function setTypeFilter(val, el) {
+  currentTypeFilter = val;
+  document.querySelectorAll('#typeFilter .tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderTable();
+}
+
+function renderTable() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  let filtered = parsedData.filter(d => {
+    if (currentTypeFilter !== 'all' && d.type !== currentTypeFilter) return false;
+    if (activeCategoryFilter !== 'all' && d.category !== activeCategoryFilter) return false;
+    if (search && !d.description.toLowerCase().includes(search) && !d.category.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  if (sortCol !== null) filtered.sort((a,b) => {
+    let va = Object.values(a)[sortCol], vb = Object.values(b)[sortCol];
+    if (typeof va === 'number') return (va-vb)*sortDir;
+    return String(va).localeCompare(String(vb)) * sortDir;
+  });
+
+  const cols = ['dateStr','type','category','description','amount'];
+  const labels = ['Date','Type','Category','Description','Amount'];
+  const thead = document.getElementById('tableHead');
+  thead.innerHTML = labels.map((l,i) => `<th onclick="setSort(${i})">${l} ${sortCol===i?(sortDir===1?'↑':'↓'):''}</th>`).join('');
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = filtered.slice(0,500).map(d => `
+    <tr>
+      <td>${d.dateStr}</td>
+      <td><span class="badge badge-${d.type}">${d.type}</span></td>
+      <td>${d.category||'—'}</td>
+      <td>${d.description||'—'}</td>
+      <td class="${d.type==='income'?'amount-pos':'amount-neg'}">${fmt(d.amount)}</td>
+    </tr>`).join('');
+
+  document.getElementById('tableFooter').textContent = `Showing ${Math.min(filtered.length,500)} of ${filtered.length} transactions`;
+}
+
+function setSort(col) {
+  if (sortCol === col) sortDir *= -1;
+  else { sortCol = col; sortDir = 1; }
+  renderTable();
+}
+
+function resetAll() {
+  parsedData = []; rawData = []; headers = [];
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('mappingSection').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'block';
+  document.getElementById('statusPill').textContent = 'awaiting data';
+  document.getElementById('statusPill').className = 'status-pill';
+  document.getElementById('fileInput').value = '';
+  Object.values(charts).forEach(c => c.destroy()); charts = {};
+}
+</script>
+</body>
+</html>
