@@ -1,0 +1,21 @@
+Date,Amount,Type,Category,Description
+2024-01-05,4500.00,income,Salary,Monthly salary - John
+2024-01-05,3800.00,income,Salary,Monthly salary - Sarah
+2024-01-07,1850.00,expense,Housing,Rent/Mortgage payment
+2024-01-08,85.50,expense,Utilities,Electricity bill
+2024-01-10,65.25,expense,Utilities,Internet + Cable
+2024-01-12,210.75,expense,Groceries,Weekly grocery shopping
+2024-01-15,45.00,expense,Transportation,Gas for car
+2024-01-18,120.00,expense,Insurance,Car insurance premium
+2024-01-20,95.00,expense,Healthcare,Doctor copay + prescriptions
+2024-01-22,65.30,expense,Dining Out,Restaurant dinner
+2024-01-25,180.00,expense,Entertainment,Netflix + Spotify + Gym membership
+2024-01-28,210.50,expense,Groceries,Weekly grocery shopping
+2024-01-30,35.00,expense,Personal,Haircut
+2024-02-01,35.00,expense,Subscriptions,Phone bill
+2024-02-03,42.75,expense,Transportation,Gas for car
+2024-02-05,4500.00,income,Salary,Monthly salary - John
+2024-02-05,3800.00,income,Salary,Monthly salary - Sarah
+2024-02-06,1850.00,expense,Housing,Rent/Mortgage payment
+2024-02-07,95.50,expense,Utilities,Electricity + Water bill
+2024-02-08,125.00,expense,Shopping,Clothing purchase
